@@ -9,7 +9,8 @@
       <input type="file" @change="handleChange">
       <div class="error">{{ fileError }}</div>
 
-      <button>Create</button>
+      <button v-if="!isPending">Create</button>
+      <button v-if="isPending" disabled>Saving...</button>
     </form>
   </div>
 </template>
@@ -17,17 +18,42 @@
 <script>
 import { ref } from 'vue'
 import useStorage from '@/composables/useStorage'
+import useCollection from '@/composables/useCollection'
+import getUser from '@/composables/getUser'
+import { timestamp } from '@/firebase/config'
+import { useRouter } from 'vue-router'
+
 export default {
   setup() {
     const { filePath, url, uploadImage } = useStorage()
+    const {error, addDoc } = useCollection('playlists')
+    const { user } = getUser()
+    const router = useRouter()
     const title = ref('')
     const description = ref('')
     const file = ref(null)
     const fileError = ref(null)
+    const isPending = ref(false)
+    
     const handleSubmit = async () => {
       if (file.value) {
+        isPending.value = true
         await uploadImage(file.value)
-        console.log('image uploaded, url: ', url.value)
+        const res  = await addDoc({
+          title: title.value,
+          description: description.value,
+          userID: user.value.uid,
+          userName: user.value.displayName,
+          coverURL: url.value,
+          filePath: filePath.value,
+          songs: [],
+          createdAt: timestamp()
+        })
+        isPending.value = false
+        if (!error.value) {
+          router.push({ name: 'PlaylistDetails', params: { id: res.id }})
+        }
+        // console.log('image uploaded, url: ', url.value)
       }
     }
     // allowed file types
@@ -44,7 +70,7 @@ export default {
       }
     }
     
-    return { title, description, handleSubmit, fileError, handleChange }
+    return { title, description, handleSubmit, fileError, handleChange, isPending }
   }
 }</script>
 
